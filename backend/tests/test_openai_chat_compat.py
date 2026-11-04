@@ -121,3 +121,43 @@ def test_extracts_text_from_supported_content_shapes():
 
     assert extract_chat_completion_text(response) == "first second third"
     assert extract_chat_completion_text(SimpleNamespace(choices=[])) == ""
+
+
+def test_none_content_falls_back_to_reasoning_content():
+    """Reasoning models via OpenAI-compatible endpoints (e.g. gpt-oss on
+    NVIDIA) may return content=None with the answer in reasoning_content."""
+    response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content=None,
+                    reasoning_content="the actual answer",
+                )
+            )
+        ]
+    )
+
+    assert extract_chat_completion_text(response) == "the actual answer"
+
+
+def test_none_content_without_reasoning_returns_empty_string():
+    response = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content=None))]
+    )
+
+    assert extract_chat_completion_text(response) == ""
+
+
+def test_reasoning_content_is_ignored_when_content_present():
+    response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content="final answer",
+                    reasoning_content="internal chain of thought",
+                )
+            )
+        ]
+    )
+
+    assert extract_chat_completion_text(response) == "final answer"
