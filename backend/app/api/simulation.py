@@ -21,6 +21,7 @@ from ..services.simulation_runner import (
 from ..services.zep_graph_memory_updater import ZepGraphMemoryManager
 from ..utils.logger import get_logger
 from ..utils.locale import t, get_locale, set_locale
+from ..utils.validation import ensure_safe_id, ensure_platform
 from ..utils.zep_lifecycle import get_graph_readers, graph_lifecycle_lock
 from ..models.project import ProjectManager
 
@@ -286,7 +287,7 @@ def _check_simulation_prepared(simulation_id: str) -> tuple:
     import os
     from ..config import Config
     
-    simulation_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
+    simulation_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, ensure_safe_id(simulation_id, 'simulation_id'))
     
     # 检查目录是否存在
     if not os.path.exists(simulation_dir):
@@ -1096,7 +1097,7 @@ def get_simulation_profiles_realtime(simulation_id: str):
         platform = request.args.get('platform') or _get_default_platform(simulation_id)
 
         # 获取模拟目录
-        sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
+        sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, ensure_safe_id(simulation_id, 'simulation_id'))
         
         if not os.path.exists(sim_dir):
             return jsonify({
@@ -1204,7 +1205,7 @@ def get_simulation_config_realtime(simulation_id: str):
     
     try:
         # 获取模拟目录
-        sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
+        sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, ensure_safe_id(simulation_id, 'simulation_id'))
         
         if not os.path.exists(sim_dir):
             return jsonify({
@@ -2157,13 +2158,16 @@ def get_simulation_posts(simulation_id: str):
     返回帖子列表（从SQLite数据库读取）
     """
     try:
-        platform = request.args.get('platform') or _get_default_platform(simulation_id)
+        platform = ensure_platform(
+            request.args.get('platform') or _get_default_platform(simulation_id)
+        )
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
 
         sim_dir = os.path.join(
             os.path.dirname(__file__),
-            f'../../uploads/simulations/{simulation_id}'
+            '../../uploads/simulations',
+            ensure_safe_id(simulation_id, 'simulation_id'),
         )
 
         db_file = f"{platform}_simulation.db"
@@ -2234,14 +2238,17 @@ def get_simulation_comments(simulation_id: str):
         offset: 偏移量
     """
     try:
-        platform = request.args.get('platform') or _get_default_platform(simulation_id)
+        platform = ensure_platform(
+            request.args.get('platform') or _get_default_platform(simulation_id)
+        )
         post_id = request.args.get('post_id')
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
 
         sim_dir = os.path.join(
             os.path.dirname(__file__),
-            f'../../uploads/simulations/{simulation_id}'
+            '../../uploads/simulations',
+            ensure_safe_id(simulation_id, 'simulation_id'),
         )
         
         db_path = os.path.join(sim_dir, f"{platform}_simulation.db")

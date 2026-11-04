@@ -22,6 +22,7 @@ from ..config import Config
 from ..utils.llm_client import LLMClient
 from ..utils.logger import get_logger
 from ..utils.locale import get_language_instruction, t
+from ..utils.validation import ensure_safe_id
 from .zep_tools import (
     ZepToolsService, 
     SearchResult, 
@@ -1957,7 +1958,10 @@ class ReportManager:
     @classmethod
     def _get_report_folder(cls, report_id: str) -> str:
         """获取报告文件夹路径"""
-        return os.path.join(cls.REPORTS_DIR, report_id)
+        return os.path.join(
+            cls.REPORTS_DIR,
+            ensure_safe_id(report_id, 'report_id'),
+        )
     
     @classmethod
     def _ensure_report_folder(cls, report_id: str) -> str:
