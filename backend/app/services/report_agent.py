@@ -831,6 +831,14 @@ REACT_UNUSED_TOOLS_HINT = "\n💡 你还没有使用过: {unused_list}，建议�
 
 REACT_FORCE_FINAL_MSG = "已达到工具调用限制，请直接输出 Final Answer: 并生成章节内容。"
 
+REACT_MALFORMED_TOOL_MSG = (
+    "【格式错误】你的回复看起来像一个工具调用，但格式无法识别（可能是工具名不存在、"
+    "JSON 格式错误、或被代码围栏包裹）。请重新回复，只做以下两件事之一：\n"
+    "- 调用一个工具：输出 <tool_call>{\"name\": \"工具名\", \"parameters\": {...}}</tool_call>，"
+    "工具名必须是可用工具之一\n"
+    "- 输出最终内容：以 'Final Answer:' 开头生成章节正文（Markdown），不要输出 JSON"
+)
+
 # ── Chat prompt ──
 
 CHAT_SYSTEM_PROMPT_TEMPLATE = """\
@@ -1096,6 +1104,10 @@ class ReportAgent:
         # 格式2: 兜底 - LLM 直接输出裸 JSON（没包 <tool_call> 标签）
         # 只在格式1未匹配时尝试，避免误匹配正文中的 JSON
         stripped = response.strip()
+        # 兼容被 Markdown 代码围栏包裹的 JSON（```json ... ```）
+        fence_match = re.match(r'^```(?:json)?\s*\n?([\s\S]*?)\n?```$', stripped)
+        if fence_match:
+            stripped = fence_match.group(1).strip()
         if stripped.startswith('{') and stripped.endswith('}'):
             try:
                 call_data = json.loads(stripped)
@@ -1140,6 +1152,38 @@ class ReportAgent:
             if params_desc:
                 desc_parts.append(f"  参数: {params_desc}")
         return "\n".join(desc_parts)
+
+    @staticmethod
+    def _looks_like_tool_call_artifact(text: str) -> bool:
+        """判断文本是否只是一个（可能格式错误的）工具调用，而非章节正文。
+
+        防止把未执行的工具调用 JSON 当作章节最终内容写入报告（Issue #599）。
+        覆盖解析器识别不了的变体：代码围栏包裹、未注册的工具名、JSON 语法错误等。
+        """
+        stripped = (text or "").strip()
+        if not stripped:
+            return False
+
+        # 去掉单层 Markdown 代码围栏
+        fence_match = re.match(r'^```(?:json)?\s*\n?([\s\S]*?)\n?```$', stripped)
+        if fence_match:
+            stripped = fence_match.group(1).strip()
+
+        # 短文本中含有 <tool_call> 标签 → 是残留的工具调用，不是正文
+        if '<tool_call' in stripped and len(stripped) < 600:
+            return True
+
+        # 整体是一个 JSON 对象，且带有工具调用的键名特征
+        if stripped.startswith('{') and stripped.endswith('}'):
+            try:
+                data = json.loads(stripped)
+            except json.JSONDecodeError:
+                # JSON 坏了也可能是工具调用的残骸
+                return bool(re.search(r'"(?:name|tool)"\s*:', stripped))
+            if isinstance(data, dict) and (data.get("name") or data.get("tool")):
+                return True
+
+        return False
 
     @staticmethod
     def _strip_fake_tool_results(response: str) -> str:
@@ -1530,6 +1574,15 @@ class ReportAgent:
                 })
                 continue
 
+            # 回复看起来是一个格式错误的工具调用（围栏包裹/未注册工具名/坏JSON）
+            # → 不能当作章节正文，要求 LLM 重新回复（Issue #599）
+            if self._looks_like_tool_call_artifact(cleaned_response):
+                logger.warning(
+                    f"章节 [{section.title}] 回复疑似格式错误的工具调用，要求重新回复"
+                )
+                messages.append({"role": "user", "content": REACT_MALFORMED_TOOL_MSG})
+                continue
+
             # 工具调用已足够，LLM 输出了内容但没带 "Final Answer:" 前缀
             # 直接将这段内容作为最终答案，不再空转
             logger.info(t('report.sectionNoPrefix', title=section.title, count=tool_calls_count))
@@ -1562,6 +1615,11 @@ class ReportAgent:
             final_answer = response.split("Final Answer:")[-1].strip()
         else:
             final_answer = response
+
+        # 强制收尾时也不允许把工具调用残留当作章节内容（Issue #599）
+        if final_answer and self._looks_like_tool_call_artifact(final_answer):
+            logger.error(t('report.sectionForceFailed', title=section.title))
+            final_answer = t('report.sectionGenFailedContent')
         
         # 记录章节内容生成完成日志
         if self.report_logger:
