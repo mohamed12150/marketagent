@@ -55,6 +55,24 @@ class Config:
         'TREND', 'REFRESH', 'DO_NOTHING', 'FOLLOW', 'MUTE'
     ]
     
+    # 人群构建可复现性配置（Issue #751）
+    # MIROFISH_COHORT_TEMPERATURE: 设置后覆盖本体生成/人设生成/模拟配置生成的LLM温度
+    #   （设为 0 可获得尽量可复现的人群；不设置 = 保持现有默认行为）
+    # MIROFISH_COHORT_SEED: 设置后 profile 生成中的随机数（粉丝数、用户名后缀等）可复现
+    COHORT_TEMPERATURE = (
+        float(os.environ['MIROFISH_COHORT_TEMPERATURE'])
+        if os.environ.get('MIROFISH_COHORT_TEMPERATURE') else None
+    )
+    COHORT_SEED = (
+        int(os.environ['MIROFISH_COHORT_SEED'])
+        if os.environ.get('MIROFISH_COHORT_SEED') else None
+    )
+
+    @classmethod
+    def cohort_temperature(cls, default: float) -> float:
+        """人群构建LLM温度：未配置 MIROFISH_COHORT_TEMPERATURE 时返回 default"""
+        return cls.COHORT_TEMPERATURE if cls.COHORT_TEMPERATURE is not None else default
+
     # Report Agent配置
     REPORT_AGENT_MAX_TOOL_CALLS = int(os.environ.get('REPORT_AGENT_MAX_TOOL_CALLS', '5'))
     REPORT_AGENT_MAX_REFLECTION_ROUNDS = int(os.environ.get('REPORT_AGENT_MAX_REFLECTION_ROUNDS', '2'))

@@ -259,6 +259,10 @@ class OasisProfileGenerator:
             api_key=self.api_key,
             base_url=self.base_url
         )
+
+        # 可复现性：设置 MIROFISH_COHORT_SEED 后，粉丝数/用户名后缀等随机数可复现
+        # 未设置时 random.Random(None) 使用系统熵，行为与之前完全一致（Issue #751）
+        self._rng = random.Random(Config.COHORT_SEED)
         
         # Zep客户端用于检索丰富上下文
         self.zep_api_key = zep_api_key or Config.ZEP_API_KEY
@@ -321,10 +325,10 @@ class OasisProfileGenerator:
             name=name,
             bio=profile_data.get("bio", f"{entity_type}: {name}"),
             persona=profile_data.get("persona", entity.summary or f"A {entity_type} named {name}."),
-            karma=profile_data.get("karma", random.randint(500, 5000)),
-            friend_count=profile_data.get("friend_count", random.randint(50, 500)),
-            follower_count=profile_data.get("follower_count", random.randint(100, 1000)),
-            statuses_count=profile_data.get("statuses_count", random.randint(100, 2000)),
+            karma=profile_data.get("karma", self._rng.randint(500, 5000)),
+            friend_count=profile_data.get("friend_count", self._rng.randint(50, 500)),
+            follower_count=profile_data.get("follower_count", self._rng.randint(100, 1000)),
+            statuses_count=profile_data.get("statuses_count", self._rng.randint(100, 2000)),
             age=profile_data.get("age"),
             gender=profile_data.get("gender"),
             mbti=profile_data.get("mbti"),
@@ -342,7 +346,7 @@ class OasisProfileGenerator:
         username = ''.join(c for c in username if c.isalnum() or c == '_')
         
         # 添加随机后缀避免重复
-        suffix = random.randint(100, 999)
+        suffix = self._rng.randint(100, 999)
         return f"{username}_{suffix}"
     
     def _search_zep_for_entity(self, entity: EntityNode) -> Dict[str, Any]:
@@ -578,7 +582,7 @@ class OasisProfileGenerator:
                         {"role": "user", "content": prompt}
                     ],
                     response_format={"type": "json_object"},
-                    temperature=0.7 - (attempt * 0.1),  # 每次重试降低温度
+                    temperature=Config.cohort_temperature(0.7 - attempt * 0.1),  # 每次重试降低温度；可被 MIROFISH_COHORT_TEMPERATURE 覆盖
                     # 不设置max_tokens，让LLM自由发挥
                 )
                 
@@ -831,10 +835,10 @@ class OasisProfileGenerator:
             return {
                 "bio": f"{entity_type} with interests in academics and social issues.",
                 "persona": f"{entity_name} is a {entity_type.lower()} who is actively engaged in academic and social discussions. They enjoy sharing perspectives and connecting with peers.",
-                "age": random.randint(18, 30),
-                "gender": random.choice(["male", "female"]),
-                "mbti": random.choice(self.MBTI_TYPES),
-                "country": random.choice(self.COUNTRIES),
+                "age": self._rng.randint(18, 30),
+                "gender": self._rng.choice(["male", "female"]),
+                "mbti": self._rng.choice(self.MBTI_TYPES),
+                "country": self._rng.choice(self.COUNTRIES),
                 "profession": "Student",
                 "interested_topics": ["Education", "Social Issues", "Technology"],
             }
@@ -843,10 +847,10 @@ class OasisProfileGenerator:
             return {
                 "bio": f"Expert and thought leader in their field.",
                 "persona": f"{entity_name} is a recognized {entity_type.lower()} who shares insights and opinions on important matters. They are known for their expertise and influence in public discourse.",
-                "age": random.randint(35, 60),
-                "gender": random.choice(["male", "female"]),
-                "mbti": random.choice(["ENTJ", "INTJ", "ENTP", "INTP"]),
-                "country": random.choice(self.COUNTRIES),
+                "age": self._rng.randint(35, 60),
+                "gender": self._rng.choice(["male", "female"]),
+                "mbti": self._rng.choice(["ENTJ", "INTJ", "ENTP", "INTP"]),
+                "country": self._rng.choice(self.COUNTRIES),
                 "profession": entity_attributes.get("occupation", "Expert"),
                 "interested_topics": ["Politics", "Economics", "Culture & Society"],
             }
@@ -880,10 +884,10 @@ class OasisProfileGenerator:
             return {
                 "bio": entity_summary[:150] if entity_summary else f"{entity_type}: {entity_name}",
                 "persona": entity_summary or f"{entity_name} is a {entity_type.lower()} participating in social discussions.",
-                "age": random.randint(25, 50),
-                "gender": random.choice(["male", "female"]),
-                "mbti": random.choice(self.MBTI_TYPES),
-                "country": random.choice(self.COUNTRIES),
+                "age": self._rng.randint(25, 50),
+                "gender": self._rng.choice(["male", "female"]),
+                "mbti": self._rng.choice(self.MBTI_TYPES),
+                "country": self._rng.choice(self.COUNTRIES),
                 "profession": entity_type,
                 "interested_topics": ["General", "Social Issues"],
             }
