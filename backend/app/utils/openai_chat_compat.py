@@ -67,6 +67,23 @@ def extract_chat_completion_text(response: Any) -> str:
     if message is None:
         return ""
 
+    text = _extract_message_text(message)
+    if text.strip():
+        return text
+
+    # Some reasoning models served through OpenAI-compatible endpoints
+    # (e.g. gpt-oss via NVIDIA) return message.content = None and put the
+    # final answer in message.reasoning_content. Fall back to it so the
+    # caller does not silently receive an empty string.
+    reasoning = getattr(message, "reasoning_content", None)
+    if isinstance(reasoning, str) and reasoning.strip():
+        return reasoning
+
+    return text
+
+
+def _extract_message_text(message: Any) -> str:
+    """Extract text from message.content across SDK content shapes."""
     content = getattr(message, "content", "")
 
     if isinstance(content, str):
