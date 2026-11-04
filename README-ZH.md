@@ -127,6 +127,22 @@ LLM_MODEL_NAME=qwen-plus
 ZEP_API_KEY=your_zep_api_key
 ```
 
+**远程 / 服务器部署（可选）：**
+
+前端默认访问 `http://localhost:5001` 的后端。当后端部署在其他机器（如 VPS）时，创建 `frontend/.env` 并指向后端地址：
+
+```env
+# frontend/.env
+VITE_API_BASE_URL=http://your-server-ip:5001
+```
+
+后端侧建议限制允许调用 API 的来源（默认为 `*`）：
+
+```env
+# .env（项目根目录）
+CORS_ORIGINS=https://your-domain.com
+```
+
 #### 2. 安装依赖
 
 ```bash

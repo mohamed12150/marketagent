@@ -31,6 +31,15 @@ class Config:
     
     # Zep配置
     ZEP_API_KEY = os.environ.get('ZEP_API_KEY')
+
+    # CORS配置：允许访问 /api/* 的来源，逗号分隔
+    # 默认 "*"（保持现有行为，适合本机使用）；部署到服务器时建议设置为前端地址，
+    # 例如 CORS_ORIGINS=https://your-domain.com,http://localhost:3000
+    CORS_ORIGINS = [
+        origin.strip()
+        for origin in os.environ.get('CORS_ORIGINS', '*').split(',')
+        if origin.strip()
+    ] or ['*']
     
     # 文件上传配置
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB

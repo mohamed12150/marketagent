@@ -127,6 +127,22 @@ LLM_MODEL_NAME=qwen-plus
 ZEP_API_KEY=your_zep_api_key
 ```
 
+**Remote / VPS Deployment (optional):**
+
+By default the frontend calls the backend at `http://localhost:5001`. When the backend runs on another machine (e.g. a VPS), create `frontend/.env` and point the frontend at it:
+
+```env
+# frontend/.env
+VITE_API_BASE_URL=http://your-server-ip:5001
+```
+
+On the backend side, restrict which origins may call the API (defaults to `*`):
+
+```env
+# .env (project root)
+CORS_ORIGINS=https://your-domain.com
+```
+
 #### 2. Install Dependencies
 
 ```bash
